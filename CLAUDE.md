@@ -15,7 +15,8 @@ NexusJs/
 ├── packages/
 │   ├── compiler/             # Rust crate — SWC-based AST analysis + WASM output
 │   ├── core/                 # (upcoming) TS runtime core
-│   └── primitives/           # (upcoming) Semantic UI components
+│   ├── primitives/           # TS types: Stack/Text/Action/Input + NexusRenderer<TNode>
+│   └── web/                  # Web renderer: maps primitives → HTML + inline styles
 ├── docs/
 │   └── action-plan.md        # Master task list (5 phases)
 ├── package.json              # Root — turbo dev/build/test scripts
@@ -92,9 +93,21 @@ src/
 - [x] Task 2.4 — Vite Plugin + Rust CLI binary (`nexus-compiler`) with stdin/stdout JSON bridge
 
 - [x] Task 3.1 — Core Interface: TypeScript types for `<Stack>`, `<Text>`, `<Action>`, `<Input>` + `NexusRenderer<TNode>` contract
+- [x] Task 3.2 — Web Renderer: `@nexus/web` package — maps all four primitives to React/HTML using inline styles + CSS variables
+
+## Web Renderer design decisions (Task 3.2)
+- Package: `packages/web` (`@nexus/web`), peer depends on React ^18 || ^19
+- Styling strategy: inline styles for everything (colors, spacing, layout) so the renderer is self-contained — no Tailwind config required
+- Colors: all `ColorToken` values resolve to `--nexus-*` CSS custom properties; theme is injected at app root
+- Spacing: `SpaceScale` integers map to Tailwind's 4px-unit convention (1→4px, 2→8px, etc.); `"Npx"` and `"N%"` strings pass through unchanged
+- `NexusRenderer<ReactElement>` is satisfied in `renderer.ts`; children cast is safe because React always passes ReactNode at runtime
+- `Spinner` in Action is defined at module level (not inline) to avoid re-mount on each render
+- Static style maps hoisted outside components to avoid object recreation per render
+- Input bridges `onChange(value: string)` and `onSubmit(value: string)` to the native React event API
+- Action renders `<a>` when `href` is set, `<button type="button">` otherwise; `link` variant skips size padding
 
 ## In Progress
-- [ ] Task 3.2 — Web Renderer: maps primitives to HTML + Tailwind classes
+- [ ] Task 3.3 — Native Renderer
 
 ## Turborepo Pipeline Logic
 - `build` depends on `^build` — upstream packages build first
