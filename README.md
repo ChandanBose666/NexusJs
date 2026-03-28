@@ -1,112 +1,469 @@
 # Nexus.js
 
-A high-performance JavaScript framework with a Rust compiler core.
+> A high-performance JavaScript framework with a Rust compiler core — write once, render everywhere.
 
-## Vision
+Nexus.js eliminates entire categories of boilerplate by making the infrastructure invisible. Three pillars drive the design:
 
-Nexus.js eliminates entire categories of boilerplate by making the infrastructure invisible:
-
-| Pillar | What it does |
+| Pillar | Problem it solves |
 |---|---|
-| **Fluid Execution** | Automatically splits a single component file into Server and Client bundles — no manual `"use client"` annotations |
-| **Zero-Fetch Sync** | Replaces `fetch()` calls with a CRDT-powered WebSocket delta stream compiled to WebAssembly |
-| **Semantic UI** | A single `<Stack>`, `<Text>`, `<Action>`, `<Input>` component tree renders to Web, React Native, and Email simultaneously |
+| **Fluid Execution** | No more `"use client"` / `"use server"` annotations — the compiler figures it out |
+| **Semantic UI** | One component tree renders to Web, React Native, and Email simultaneously |
+| **Zero-Fetch Sync** | No more `fetch()` — state syncs over a CRDT-powered WebSocket delta stream *(Phase 4)* |
 
-## Architecture
+---
+
+## Table of Contents
+
+- [Why Nexus.js?](#why-nexusjs)
+- [Architecture Overview](#architecture-overview)
+- [Pillar 1 — Fluid Execution](#pillar-1--fluid-execution-phase-2-complete)
+- [Pillar 2 — Semantic UI](#pillar-2--semantic-ui-phase-3-complete)
+- [Pillar 3 — Zero-Fetch Sync](#pillar-3--zero-fetch-sync-phase-4-planned)
+- [Monorepo Structure](#monorepo-structure)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+- [Build Status](#build-status)
+
+---
+
+## Why Nexus.js?
+
+Modern web development forces developers to make the same decisions repeatedly:
+
+- "Is this component a Server Component or a Client Component?"
+- "Should I `fetch()` this data or use a state manager?"
+- "How do I reuse this UI in my mobile app? In my transactional email?"
+
+Nexus.js answers all three questions at the framework level — once — so you never have to again.
+
+---
+
+## Architecture Overview
 
 ```
 NexusJs/
-├── apps/
-│   └── web/                  # Vite dev/demo app
 ├── packages/
-│   ├── compiler/             # Rust — SWC-based AST analyzer and code slicer
-│   ├── core/                 # TypeScript runtime (upcoming)
-│   ├── primitives/           # Semantic UI type contracts (Stack/Text/Action/Input)
-│   ├── web/                  # Web renderer — maps primitives to React/HTML
-│   ├── native/               # Native renderer — maps primitives to React Native
-│   └── email/                # Email renderer — maps primitives to MSO-safe HTML strings
-└── docs/
-    ├── action-plan.md        # Task-by-task build plan
-    └── implementation-plan.md
+│   ├── compiler/      ← Rust + SWC: parses your code, detects server/client boundaries
+│   ├── vite-plugin/   ← Calls the Rust binary at build time, routes .nexus.tsx files
+│   ├── primitives/    ← TypeScript type contracts for all four UI primitives
+│   ├── web/           ← Renders primitives as React/HTML (inline styles + CSS vars)
+│   ├── native/        ← Renders primitives as React Native View/Text/Pressable/TextInput
+│   └── email/         ← Renders primitives as MSO-safe HTML strings
+└── apps/
+    └── web/           ← Vite demo/dev app (wired to @nexus/vite-plugin)
 ```
 
-## How the Slicer Works
+---
 
-Given a single mixed component:
+## Pillar 1 — Fluid Execution *(Phase 2, complete)*
+
+The Rust compiler analyses every `.nexus.tsx` file at build time using [SWC](https://swc.rs) and automatically produces two bundles — no annotations required.
+
+### How It Works
+
+Given a single mixed file:
 
 ```tsx
-import { db } from './db';           // server-only
+// components/UserDashboard.nexus.tsx
 
-export async function getUser(id) {  // runs on server
+import { db } from './db';                    // ← server trigger (DB import)
+
+export async function getUser(id: string) {   // classified: ServerOnly
   return db.user.findUnique({ where: { id } });
 }
 
-export function UserCard({ userId }) {
-  window.analytics.track('view');    // browser-only
-  return <button onClick={() => getUser(userId)}>Load</button>;
+export function UserCard({ userId }: { userId: string }) {
+  window.analytics.track('view');             // ← client trigger (browser global)
+  return <button onClick={() => getUser(userId)}>Load User</button>;
 }
 ```
 
 The compiler produces two outputs automatically:
 
-**`.nexus/module.server.js`** — keeps `getUser`, strips `UserCard`
+**`.nexus/UserDashboard.server.js`** — contains `getUser`, strips `UserCard`
 
-**`.nexus/module.client.js`** — keeps `UserCard`, replaces `getUser` with a type-safe RPC bridge:
+**`.nexus/UserDashboard.client.js`** — contains `UserCard`, replaces `getUser` with a type-safe RPC bridge:
+
 ```ts
-export async function getUser(id) {
+// Auto-generated by the Nexus compiler — never written by hand
+export async function getUser(id: string) {
   return __nexus_rpc('/api/__nexus/getUser', { id });
 }
 ```
 
+### Classification System
+
+The Rust `Classifier` runs two passes over every declaration in the file:
+
+| DeclKind | Meaning | Example trigger |
+|---|---|---|
+| `ServerOnly` | Uses server resources | `process.env`, DB imports, `node:*` modules |
+| `ClientOnly` | Uses browser APIs | `window`, `document`, `localStorage` |
+| `Shared` | Pure logic, safe anywhere | Math, string utilities |
+| `BoundaryCrossing` | Server fn called from client | Generates RPC stub automatically |
+| `Mixed` | Both triggers in same fn | Flagged as a compile error |
+
+### Server Triggers (detected by `SecretScanner`)
+
+- `process.env.*` — environment variable access
+- Database imports: `prisma`, `drizzle`, `mongoose`, `pg`, `mysql2`, `better-sqlite3`, and more
+- Node.js protocol imports: `node:fs`, `node:crypto`, etc.
+
+### Client Triggers (detected by `CapabilityScanner`)
+
+- Browser globals: `window`, `document`, `localStorage`, `sessionStorage`, `navigator`, `location`
+- DOM event APIs, `fetch` in browser context
+
+### Vite Plugin
+
+`@nexus/vite-plugin` intercepts every `.nexus.tsx` / `.nexus.ts` file and routes it through the Rust binary via a `stdin → stdout` JSON bridge. Results are cached per file ID and cleared on HMR update.
+
+```ts
+// vite.config.ts
+import { nexus } from '@nexus/vite-plugin';
+
+export default {
+  plugins: [nexus()],
+};
+```
+
+---
+
+## Pillar 2 — Semantic UI *(Phase 3, complete)*
+
+Four semantic primitives — `Stack`, `Text`, `Action`, `Input` — describe *what* a UI element is, not *how* to render it. Each render target (`@nexus/web`, `@nexus/native`, `@nexus/email`) maps them to its own native elements.
+
+### The Four Primitives
+
+#### `<Stack>` — universal layout
+
+```tsx
+<Stack direction="row" gap={4} padding={6} align="center" background="surface" radius="md">
+  {children}
+</Stack>
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `direction` | `"row" \| "column" \| "row-reverse" \| "column-reverse"` | Flex direction |
+| `align` | `"start" \| "center" \| "end" \| "stretch" \| "baseline"` | Cross-axis alignment |
+| `justify` | `"start" \| "center" \| "end" \| "between" \| "around" \| "evenly"` | Main-axis justification |
+| `gap` | `SpaceValue` | Gap between children |
+| `padding` / `paddingX` / `paddingY` / `paddingTop` / … | `SpaceValue` | Inner spacing |
+| `background` | `ColorValue` | Background fill |
+| `radius` | `"none" \| "sm" \| "md" \| "lg" \| "full"` | Border radius |
+| `wrap` | `boolean` | Whether children wrap |
+| `flex` | `number` | Flex grow factor |
+
+#### `<Text>` — universal typography
+
+```tsx
+<Text variant="heading" as="h1" weight="bold" color="primary" align="center">
+  Welcome to Nexus
+</Text>
+```
+
+| Variant | Default tag | Style preset |
+|---|---|---|
+| `body` | `<p>` | 16px, relaxed line height |
+| `caption` | `<span>` | 12px, muted |
+| `label` | `<span>` | 14px, medium weight |
+| `heading` | `<h2>` | 24px, semibold |
+| `title` | `<h1>` | 20px, semibold |
+| `display` | `<h1>` | 36px, bold |
+| `code` | `<code>` | 14px, monospace |
+| `overline` | `<span>` | 12px, uppercase, tracked |
+
+Additional props: `size`, `weight`, `color`, `align`, `maxLines`, `underline`, `strikethrough`, `as` (web-only tag override).
+
+#### `<Action>` — universal interactive
+
+```tsx
+<Action variant="primary" size="md" onPress={handleSubmit} loading={isSubmitting}>
+  Submit
+</Action>
+
+<Action variant="link" href="https://nexusjs.dev" external>
+  Learn more →
+</Action>
+```
+
+| Variant | Appearance |
+|---|---|
+| `primary` | Filled, high-emphasis CTA |
+| `secondary` | Outlined, medium-emphasis |
+| `ghost` | No background, low-emphasis |
+| `danger` | Destructive action (red fill) |
+| `link` | Inline hyperlink appearance |
+
+Sizes: `xs`, `sm`, `md`, `lg`. Additional props: `href`, `external`, `disabled`, `loading`, `fullWidth`, `radius`, color/padding overrides.
+
+#### `<Input>` — universal form field
+
+```tsx
+<Input
+  type="email"
+  variant="outline"
+  fieldLabel="Email address"
+  placeholder="you@example.com"
+  hint="We'll never share your email."
+  error={errors.email}
+  leadingIcon="✉"
+  onChange={setEmail}
+  required
+/>
+```
+
+Types: `text`, `email`, `password`, `number`, `tel`, `url`, `search`.
+Variants: `outline`, `filled`, `underline`.
+Additional props: `fieldLabel`, `placeholder`, `value`, `multiline`, `rows`, `maxLength`, `required`, `disabled`, `readOnly`, `error`, `hint`, `leadingIcon`, `trailingIcon`, `onChange`, `onSubmit`.
+
+---
+
+### Design Token System
+
+All spacing and color values use a design-token-shaped type system — no magic strings.
+
+**`SpaceValue`** — maps to Tailwind's 4px-unit convention:
+
+| Token | px equivalent |
+|---|---|
+| `0` | 0px |
+| `1` | 4px |
+| `2` | 8px |
+| `4` | 16px |
+| `6` | 24px |
+| `8` | 32px |
+| `"16px"` | 16px (passthrough) |
+| `"50%"` | 50% (passthrough) |
+
+**`ColorToken`** — semantic color names resolved by the active theme:
+
+`background`, `surface`, `border`, `primary`, `primary-fg`, `secondary`, `secondary-fg`, `success`, `warning`, `danger`, `muted`, `muted-fg`
+
+On **web** these resolve to CSS custom properties (`var(--nexus-primary)`), letting you theme the entire UI by setting variables on `:root`. On **native** and **email** they resolve against a built-in `DEFAULT_THEME` palette (hex strings).
+
+---
+
+### The Three Render Targets
+
+The `NexusRenderer<TNode>` contract enforces that every target implements all four primitives:
+
+```ts
+interface NexusRenderer<TNode> {
+  Stack:  (props: StackProps)  => TNode;
+  Text:   (props: TextProps)   => TNode;
+  Action: (props: ActionProps) => TNode;
+  Input:  (props: InputProps)  => TNode;
+}
+```
+
+#### `@nexus/web` — `TNode = ReactElement`
+
+React components with inline CSS styles. No Tailwind dependency — works in any React app out of the box. Colors use CSS custom properties so the theme is overridable at the `:root` level.
+
+```tsx
+import { Stack, Text, Action, Input } from '@nexus/web';
+
+function LoginForm() {
+  return (
+    <Stack direction="column" gap={4} padding={6} background="surface" radius="md">
+      <Text variant="title">Sign in</Text>
+      <Input type="email" fieldLabel="Email" placeholder="you@example.com" />
+      <Input type="password" fieldLabel="Password" placeholder="••••••••" />
+      <Action variant="primary" fullWidth>Continue</Action>
+    </Stack>
+  );
+}
+```
+
+#### `@nexus/native` — `TNode = ReactElement`
+
+React Native components. `SpaceValue` resolves to dp numbers, `ColorToken` resolves against `DEFAULT_THEME`. The `as` prop (HTML element override) is silently ignored. `href` opens via `Linking.openURL`. Loading states use `ActivityIndicator`.
+
+```tsx
+import { Stack, Text, Action, Input } from '@nexus/native';
+
+// Same primitives — identical props — renders natively on iOS/Android
+function LoginForm() {
+  return (
+    <Stack direction="column" gap={4} padding={6} background="surface" radius="md">
+      <Text variant="title">Sign in</Text>
+      <Input type="email" fieldLabel="Email" placeholder="you@example.com" />
+      <Action variant="primary" fullWidth>Continue</Action>
+    </Stack>
+  );
+}
+```
+
+#### `@nexus/email` — `TNode = string`
+
+Pure HTML string output — no React. Layout uses `<table>` elements (Outlook-safe). All styles are inline. Interactive props (`onPress`, `onChange`) are silently ignored. Includes a `wrapDocument()` utility for full MSO-safe email documents.
+
+```ts
+import { Stack, Text, Action, wrapDocument } from '@nexus/email';
+
+const body = Stack({
+  padding: 6,
+  background: 'surface',
+  children: [
+    Text({ variant: 'heading', children: 'Reset your password' }),
+    Text({ variant: 'body', children: 'Click the button below to reset your password.' }),
+    Action({ variant: 'primary', href: 'https://example.com/reset', children: 'Reset Password' }),
+  ],
+});
+
+const html = wrapDocument(body, {
+  title: 'Password Reset',
+  previewText: 'Reset your Nexus account password',
+});
+// → full MSO-safe HTML document, ready to send
+```
+
+---
+
+## Pillar 3 — Zero-Fetch Sync *(Phase 4, planned)*
+
+Coming next. The goal: replace `fetch()` calls with a CRDT-powered WebSocket delta stream compiled to WebAssembly.
+
+```tsx
+// What you'll write
+const { user, update } = useSync('users', userId);
+
+// What Nexus does invisibly
+// → opens a WebSocket to the server
+// → receives binary "delta" patches (Automerge CRDT format)
+// → applies them locally via WASM
+// → rolls back optimistically on rejection
+```
+
+**Task 4.1** — Compile Automerge (Rust) → WASM via `wasm-pack`, expose `CrdtDoc` via `wasm-bindgen`
+**Task 4.2** — `useSync` hook connects UI components to the WASM CRDT state
+**Task 4.3** — WebSocket server broadcasts binary delta frames to all clients
+**Task 4.4** — Optimistic rollback when the server sends a rejection frame
+
+---
+
+## Monorepo Structure
+
+```
+NexusJs/
+├── apps/
+│   └── web/                   Vite dev / demo app
+├── packages/
+│   ├── compiler/              Rust crate — SWC AST analysis + nexus-compiler CLI binary
+│   ├── vite-plugin/           @nexus/vite-plugin — Vite integration
+│   ├── primitives/            @nexus/primitives — TypeScript type contracts
+│   ├── web/                   @nexus/web — Web renderer (React + inline styles)
+│   ├── native/                @nexus/native — Native renderer (React Native)
+│   ├── email/                 @nexus/email — Email renderer (HTML strings)
+│   └── core/                  @nexus/core — Runtime (upcoming)
+├── docs/
+│   ├── action-plan.md         Task-by-task build plan
+│   └── implementation-plan.md
+├── CLAUDE.md                  Architecture decisions log
+├── package.json               Root Turborepo scripts
+├── pnpm-workspace.yaml
+└── turbo.json
+```
+
+---
+
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Monorepo | pnpm workspaces + Turborepo |
-| Compiler | Rust + SWC (AST parsing and transformation) |
-| WASM bridge | wasm-bindgen |
-| Dev app | Vite |
-| Runtime | TypeScript |
+| Layer | Technology | Why |
+|---|---|---|
+| Package manager | pnpm | Workspace support, fast installs |
+| Monorepo orchestration | Turborepo | Task caching, parallel execution, `dependsOn` ordering |
+| Compiler core | Rust + SWC | AST-level analysis, zero-overhead, WASM output |
+| WASM bridge | wasm-bindgen | Standard Rust → JS interop |
+| Dev app | Vite | Fast HMR, plugin API for compiler integration |
+| Web renderer | React 18/19 | Peer dep, inline styles |
+| Native renderer | React Native ≥ 0.72 | Peer dep, StyleSheet-compatible objects |
+| Email renderer | Zero deps | Pure TypeScript string composition |
+| Language | TypeScript 5.4+ | Strict mode throughout |
+
+---
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org) 20+
 - [pnpm](https://pnpm.io) — `npm install -g pnpm`
-- [Rust](https://rustup.rs) — required to build the compiler
+- [Rust](https://rustup.rs) — required to build the compiler core
 
 ## Getting Started
 
 ```bash
-# Install JS dependencies
+# 1. Clone and install JS dependencies
+git clone https://github.com/ChandanBose666/NexusJs.git
+cd NexusJs
 pnpm install
 
-# Build and test the Rust compiler
+# 2. Build the Rust compiler (required before first use)
 cd packages/compiler
-cargo test
+cargo build --release
+cd ../..
 
-# Start the dev server (runs compiler watcher + Vite)
+# 3. Run tests
+cd packages/compiler && cargo test    # Rust unit tests
+cd packages/email   && npx jest       # Email renderer tests (40 tests)
+
+# 4. Start the dev server
 pnpm dev
 ```
 
+> **Windows note:** `cargo` is not on Git Bash's PATH by default. Either run Rust commands in Windows CMD, or add `export PATH="/c/Users/$USER/.cargo/bin:$PATH"` to your `~/.bashrc`.
+
+---
+
 ## Build Status
 
-| Task | Description | Status |
-|---|---|---|
-| 1.1 | Monorepo setup (pnpm + Turborepo) | ✅ Done |
-| 1.2 | Rust compiler crate | ✅ Done |
-| 1.3 | Cargo.toml (swc_core, serde, wasm-bindgen) | ✅ Done |
-| 1.4 | Dev pipeline (turbo dev + Vite) | ✅ Done |
-| 2.1 | CapabilityScanner (window, document, localStorage) | ✅ Done |
-| 2.2 | SecretScanner (process.env, DB imports) | ✅ Done |
-| 2.3 | Slicer — Classifier + Transformer + RPC stubs | ✅ Done |
-| 2.4 | Vite Plugin + Rust CLI binary | ✅ Done |
-| 3.1 | Semantic UI — Core Interface types | ✅ Done |
-| 3.2 | Semantic UI — Web Renderer (`@nexus/web`) | ✅ Done |
-| 3.3 | Semantic UI — Native Renderer (`@nexus/native`) | ✅ Done |
-| 3.4 | Semantic UI — Email Renderer (`@nexus/email`) | ✅ Done |
-| 4.x | Zero-Fetch Sync (CRDT + WebSocket) | ⏳ Planned |
-| 5.x | Error Resilience & Nexus Inspector | ⏳ Planned |
+### Phase 1 — Environment Setup ✅
+
+| Task | Description |
+|---|---|
+| 1.1 | Monorepo setup (pnpm + Turborepo) |
+| 1.2 | Rust compiler crate initialised |
+| 1.3 | Cargo.toml: swc_core 59.x, serde, wasm-bindgen |
+| 1.4 | Dev pipeline: Turborepo `dependsOn` + persistent Vite watcher |
+
+### Phase 2 — Fluid Execution ✅
+
+| Task | Description |
+|---|---|
+| 2.1 | `CapabilityScanner` — detects `window`, `document`, `localStorage` |
+| 2.2 | `SecretScanner` — detects `process.env`, DB imports, `node:` protocol |
+| 2.3 | `Slicer` — Classifier (5 DeclKinds) + Transformer + RPC stub injection |
+| 2.4 | `@nexus/vite-plugin` + `nexus-compiler` CLI binary |
+
+### Phase 3 — Semantic UI ✅
+
+| Task | Description |
+|---|---|
+| 3.1 | `@nexus/primitives` — TypeScript type contracts for all four primitives |
+| 3.2 | `@nexus/web` — Web renderer (React, inline styles, CSS custom properties) |
+| 3.3 | `@nexus/native` — Native renderer (React Native, dp units, DEFAULT_THEME) |
+| 3.4 | `@nexus/email` — Email renderer (HTML strings, MSO-safe, 40 tests) |
+
+### Phase 4 — Zero-Fetch Sync 🔨
+
+| Task | Description |
+|---|---|
+| 4.1 | WASM bridge — Automerge Rust → WASM via wasm-pack |
+| 4.2 | `useSync` hook — connects UI to WASM CRDT state |
+| 4.3 | WebSocket binary transport — delta broadcast server |
+| 4.4 | Optimistic rollbacks — revert local state on rejection |
+
+### Phase 5 — Sidecar & Polish ⏳
+
+| Task | Description |
+|---|---|
+| 5.1 | Partytown-style Web Worker for 3rd-party scripts |
+| 5.2 | Nexus Inspector — browser overlay showing server/client split |
+| 5.3 | Snapshot boundary — time-travel error recovery |
+
+---
 
 ## Contributing
 
-This project is currently in early development. The architecture is being established phase by phase — see `docs/action-plan.md` for the full task list.
+This project is in active early development — the architecture is being established phase by phase. See [`docs/action-plan.md`](docs/action-plan.md) for the full task list.
