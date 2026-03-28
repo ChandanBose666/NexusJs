@@ -22,7 +22,8 @@ NexusJs/
 │   ├── compiler/             # Rust — SWC-based AST analyzer and code slicer
 │   ├── core/                 # TypeScript runtime (upcoming)
 │   ├── primitives/           # Semantic UI type contracts (Stack/Text/Action/Input)
-│   └── web/                  # Web renderer — maps primitives to React/HTML
+│   ├── web/                  # Web renderer — maps primitives to React/HTML
+│   └── native/               # Native renderer — maps primitives to React Native
 └── docs/
     ├── action-plan.md        # Task-by-task build plan
     └── implementation-plan.md
@@ -100,7 +101,7 @@ pnpm dev
 | 2.4 | Vite Plugin + Rust CLI binary | ✅ Done |
 | 3.1 | Semantic UI — Core Interface types | ✅ Done |
 | 3.2 | Semantic UI — Web Renderer (`@nexus/web`) | ✅ Done |
-| 3.3 | Semantic UI — Native Renderer (React Native) | ⏳ Planned |
+| 3.3 | Semantic UI — Native Renderer (`@nexus/native`) | ✅ Done |
 | 3.4 | Semantic UI — Email Renderer (MJML) | ⏳ Planned |
 | 4.x | Zero-Fetch Sync (CRDT + WebSocket) | ⏳ Planned |
 | 5.x | Error Resilience & Nexus Inspector | ⏳ Planned |
