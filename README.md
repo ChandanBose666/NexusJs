@@ -23,7 +23,8 @@ NexusJs/
 │   ├── core/                 # TypeScript runtime (upcoming)
 │   ├── primitives/           # Semantic UI type contracts (Stack/Text/Action/Input)
 │   ├── web/                  # Web renderer — maps primitives to React/HTML
-│   └── native/               # Native renderer — maps primitives to React Native
+│   ├── native/               # Native renderer — maps primitives to React Native
+│   └── email/                # Email renderer — maps primitives to MSO-safe HTML strings
 └── docs/
     ├── action-plan.md        # Task-by-task build plan
     └── implementation-plan.md
@@ -102,7 +103,7 @@ pnpm dev
 | 3.1 | Semantic UI — Core Interface types | ✅ Done |
 | 3.2 | Semantic UI — Web Renderer (`@nexus/web`) | ✅ Done |
 | 3.3 | Semantic UI — Native Renderer (`@nexus/native`) | ✅ Done |
-| 3.4 | Semantic UI — Email Renderer (MJML) | ⏳ Planned |
+| 3.4 | Semantic UI — Email Renderer (`@nexus/email`) | ✅ Done |
 | 4.x | Zero-Fetch Sync (CRDT + WebSocket) | ⏳ Planned |
 | 5.x | Error Resilience & Nexus Inspector | ⏳ Planned |
 

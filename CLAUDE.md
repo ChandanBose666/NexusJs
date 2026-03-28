@@ -17,7 +17,8 @@ NexusJs/
 │   ├── core/                 # (upcoming) TS runtime core
 │   ├── primitives/           # TS types: Stack/Text/Action/Input + NexusRenderer<TNode>
 │   ├── web/                  # Web renderer: maps primitives → HTML + inline styles
-│   └── native/               # Native renderer: maps primitives → React Native View/Text/Pressable/TextInput
+│   ├── native/               # Native renderer: maps primitives → React Native View/Text/Pressable/TextInput
+│   └── email/                # Email renderer: maps primitives → MSO-safe HTML strings (TNode=string)
 ├── docs/
 │   └── action-plan.md        # Master task list (5 phases)
 ├── package.json              # Root — turbo dev/build/test scripts
@@ -121,8 +122,23 @@ src/
 - Input uses `aria-required` / `aria-invalid` (new-arch RN accessibility API, not deprecated `accessibilityRequired`)
 - Icon slots render the raw icon string — intended to be swapped for an icon library in user code
 
+- [x] Task 3.4 — Email Renderer: `@nexus/email` — maps all four primitives to MSO-safe HTML strings
+
+## Email Renderer design decisions (Task 3.4)
+- TNode = string — the only renderer that doesn't use React; all functions return raw HTML strings
+- No JSX in this package — pure TypeScript string composition
+- Layout: `<table role="presentation">` always (flexbox unsupported in Outlook)
+- Stack column → `<table><tr><td>` single-column; row → `<table><tr>` (children expected to be `<td>` elements)
+- gap → applied as padding on the `<td>` (CSS `gap` not supported in email clients)
+- Color: same DEFAULT_THEME hex strings as native (no CSS variables in email clients)
+- Text children are run through `escapeHtml` to prevent injection; apostrophes are NOT escaped (not needed in text nodes, only in attributes)
+- Action always renders as `<a>` (no `<button>` in email); defaults to `href="#"` when no href given
+- Input renders a static visual placeholder only — label, underline field, error/hint text; no `<input>` tag
+- `wrapDocument()` utility produces a full MSO-safe HTML document with preview text, centering shell table, MSO conditional comments
+- 40 unit tests cover all four components + wrapDocument; pure string assertions, no DOM/jsdom required
+
 ## In Progress
-- [ ] Task 3.4 — Email Renderer
+- [ ] Phase 4 — Zero-Fetch Sync (Task 4.1 next)
 
 ## Turborepo Pipeline Logic
 - `build` depends on `^build` — upstream packages build first
