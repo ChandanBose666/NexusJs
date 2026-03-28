@@ -16,7 +16,8 @@ NexusJs/
 │   ├── compiler/             # Rust crate — SWC-based AST analysis + WASM output
 │   ├── core/                 # (upcoming) TS runtime core
 │   ├── primitives/           # TS types: Stack/Text/Action/Input + NexusRenderer<TNode>
-│   └── web/                  # Web renderer: maps primitives → HTML + inline styles
+│   ├── web/                  # Web renderer: maps primitives → HTML + inline styles
+│   └── native/               # Native renderer: maps primitives → React Native View/Text/Pressable/TextInput
 ├── docs/
 │   └── action-plan.md        # Master task list (5 phases)
 ├── package.json              # Root — turbo dev/build/test scripts
@@ -106,8 +107,22 @@ src/
 - Input bridges `onChange(value: string)` and `onSubmit(value: string)` to the native React event API
 - Action renders `<a>` when `href` is set, `<button type="button">` otherwise; `link` variant skips size padding
 
+- [x] Task 3.3 — Native Renderer: `@nexus/native` — maps all four primitives to React Native components
+
+## Native Renderer design decisions (Task 3.3)
+- Package: `packages/native` (`@nexus/native`), peer depends on React ^18||^19 + react-native >=0.72
+- `@types/react-native` is deprecated — modern RN ships its own types; use `@types/react@^19`
+- SpaceValue → dp numbers (unitless, 4dp-per-unit convention matching web renderer)
+- ColorToken → resolved against DEFAULT_THEME (hex strings); exported so apps can read the palette
+- No CSS custom properties in RN — DEFAULT_THEME is a plain Record<ColorToken, string>
+- `as` prop (HTML element override) is web-only — silently ignored in native renderer
+- `external` prop is web-only (target="_blank") — ignored in native; all URLs open via Linking
+- Action uses `ActivityIndicator` for loading state (native spinner, no animation CSS needed)
+- Input uses `aria-required` / `aria-invalid` (new-arch RN accessibility API, not deprecated `accessibilityRequired`)
+- Icon slots render the raw icon string — intended to be swapped for an icon library in user code
+
 ## In Progress
-- [ ] Task 3.3 — Native Renderer
+- [ ] Task 3.4 — Email Renderer
 
 ## Turborepo Pipeline Logic
 - `build` depends on `^build` — upstream packages build first
