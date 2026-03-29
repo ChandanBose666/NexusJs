@@ -1,6 +1,6 @@
 import type { TextProps, TextVariant, TextElement } from "@ultimatejs/primitives";
 import { resolveColor, FONT_SIZE_PX, FONT_WEIGHT_VAL } from "./lib/tokens.js";
-import { buildStyle, escapeHtml, stringify } from "./lib/html.js";
+import { buildStyle, escapeAttr, escapeHtml, stringify } from "./lib/html.js";
 
 // ---------------------------------------------------------------------------
 // Static maps
@@ -55,6 +55,11 @@ export function Text({
   children,
   // maxLines: no email equivalent
   maxLines: _maxLines,
+  // ARIA props — silently ignored in email (HTML element semantics already provide roles)
+  role:               _role,
+  "aria-hidden":      _ariaHidden,
+  "aria-describedby": _ariaDescribedby,
+  "aria-labelledby":  _ariaLabelledby,
 }: TextProps): string {
   const tag = as ?? VARIANT_TAG[variant];
 
@@ -77,7 +82,7 @@ export function Text({
 
   // Inline tags (span, code) don't get aria-label as HTML attribute
   const isBlock = !["span", "code"].includes(tag);
-  const ariaLabel = isBlock && label ? ` aria-label="${label}"` : "";
+  const ariaLabel = isBlock && label ? ` aria-label="${escapeAttr(label)}"` : "";
   const testAttr  = testId ? ` data-testid="${testId}"` : "";
 
   // Children in email context are plain strings — escape them for safety

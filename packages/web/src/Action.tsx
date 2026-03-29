@@ -116,6 +116,15 @@ export function Action({
   label,
   testId,
   children,
+  role,
+  "aria-expanded":    ariaExpanded,
+  "aria-pressed":     ariaPressed,
+  "aria-haspopup":    ariaHaspopup,
+  "aria-controls":    ariaControls,
+  "aria-selected":    ariaSelected,
+  "aria-hidden":      ariaHidden,
+  "aria-describedby": ariaDescribedby,
+  "aria-labelledby":  ariaLabelledby,
 }: ActionProps): ReactElement {
   const isLink = href !== undefined;
   const isInteractive = !(disabled ?? false) && !(loading ?? false);
@@ -153,10 +162,19 @@ export function Action({
 
   const sharedProps = {
     style,
-    "aria-label":    label,
-    "aria-disabled": (disabled ?? false) || undefined,
-    "aria-busy":     (loading ?? false) || undefined,
-    "data-testid":   testId,
+    role,
+    "aria-label":       label,
+    "aria-disabled":    (disabled ?? false) || undefined,
+    "aria-busy":        (loading ?? false) || undefined,
+    "aria-expanded":    ariaExpanded,
+    "aria-pressed":     ariaPressed,
+    "aria-haspopup":    ariaHaspopup,
+    "aria-controls":    ariaControls,
+    "aria-selected":    ariaSelected,
+    "aria-hidden":      ariaHidden,
+    "aria-describedby": ariaDescribedby,
+    "aria-labelledby":  ariaLabelledby,
+    "data-testid":      testId,
   };
 
   const content = (

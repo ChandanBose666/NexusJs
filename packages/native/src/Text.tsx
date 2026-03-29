@@ -53,6 +53,13 @@ export function Text({
   children,
   // `as` is intentionally destructured and discarded — web-only prop
   as: _as,
+  // `role` → accessibilityRole on RNText
+  role,
+  // `aria-hidden` → importantForAccessibility
+  "aria-hidden":      ariaHidden,
+  // `aria-describedby` / `aria-labelledby` not supported in RN new-arch — silently ignored
+  "aria-describedby": _ariaDescribedby,
+  "aria-labelledby":  _ariaLabelledby,
 }: TextProps): ReactElement {
   const textDecoration =
     underline && strikethrough ? "underline line-through" :
@@ -71,7 +78,10 @@ export function Text({
         textDecoration        ? { textDecorationLine: textDecoration as "underline" | "line-through" | "underline line-through" } : null,
       ]}
       numberOfLines={maxLines}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      accessibilityRole={role as any}
       accessibilityLabel={label}
+      importantForAccessibility={ariaHidden ? "no-hide-descendants" : undefined}
       testID={testId}
     >
       {children}

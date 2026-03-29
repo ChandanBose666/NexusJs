@@ -268,3 +268,79 @@ describe("wrapDocument", () => {
     expect(html).toMatch(/background-color:#1a1a1a/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ARIA prop handling
+// ---------------------------------------------------------------------------
+
+describe("ARIA props — Stack", () => {
+  it("uses role='presentation' by default", () => {
+    const html = Stack({ children: "" });
+    expect(html).toContain('role="presentation"');
+  });
+
+  it("overrides role when role prop is provided", () => {
+    const html = Stack({ role: "list", children: "" });
+    expect(html).toContain('role="list"');
+    expect(html).not.toContain('role="presentation"');
+  });
+
+  it("silently ignores aria-live", () => {
+    const html = Stack({ "aria-live": "polite", children: "Live region" });
+    expect(html).not.toContain("aria-live");
+    expect(html).toContain("Live region");
+  });
+
+  it("silently ignores aria-hidden", () => {
+    const html = Stack({ "aria-hidden": true, children: "hidden" });
+    expect(html).not.toContain("aria-hidden");
+  });
+});
+
+describe("ARIA props — Action", () => {
+  it("silently ignores role prop", () => {
+    const html = Action({ role: "menuitem", children: "Item" });
+    expect(html).not.toContain("menuitem");
+    expect(html).toContain(">Item</a>");
+  });
+
+  it("silently ignores aria-expanded", () => {
+    const html = Action({ "aria-expanded": true, children: "Menu" });
+    expect(html).not.toContain("aria-expanded");
+  });
+
+  it("silently ignores aria-hidden", () => {
+    const html = Action({ "aria-hidden": true, children: "Hidden" });
+    expect(html).not.toContain("aria-hidden");
+  });
+});
+
+describe("ARIA props — Text", () => {
+  it("silently ignores role prop (semantic element already conveys role)", () => {
+    const html = Text({ variant: "body", role: "note", children: "Note text" });
+    expect(html).not.toContain('role=');
+    expect(html).toContain("Note text");
+  });
+
+  it("silently ignores aria-hidden", () => {
+    const html = Text({ variant: "body", "aria-hidden": true, children: "Hi" });
+    expect(html).not.toContain("aria-hidden");
+  });
+});
+
+describe("ARIA props — Input", () => {
+  it("silently ignores aria-autocomplete", () => {
+    const html = Input({ "aria-autocomplete": "list" });
+    expect(html).not.toContain("aria-autocomplete");
+  });
+
+  it("silently ignores aria-errormessage", () => {
+    const html = Input({ "aria-errormessage": "err-id" });
+    expect(html).not.toContain("aria-errormessage");
+  });
+
+  it("silently ignores aria-hidden", () => {
+    const html = Input({ "aria-hidden": true });
+    expect(html).not.toContain("aria-hidden");
+  });
+});

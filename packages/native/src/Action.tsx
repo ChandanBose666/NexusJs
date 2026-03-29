@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { Pressable, Text as RNText, Linking, ActivityIndicator } from "react-native";
 import type { ActionProps, ActionVariant, ActionSize } from "@ultimatejs/primitives";
 import { resolveSpace, resolveColor, RADIUS_DP, DEFAULT_THEME } from "./lib/tokens.js";
@@ -69,6 +69,18 @@ export function Action({
   children,
   // `external` is web-only (target="_blank") — ignored on native
   external: _external,
+  role,
+  "aria-expanded":    ariaExpanded,
+  "aria-pressed":     ariaPressed,
+  "aria-selected":    ariaSelected,
+  // `aria-haspopup` and `aria-controls` have no RN equivalent — silently ignored
+  "aria-haspopup":    _ariaHaspopup,
+  "aria-controls":    _ariaControls,
+  // `aria-hidden` → importantForAccessibility
+  "aria-hidden":      ariaHidden,
+  // `aria-describedby` / `aria-labelledby` not supported in RN new-arch — silently ignored
+  "aria-describedby": _ariaDescribedby,
+  "aria-labelledby":  _ariaLabelledby,
 }: ActionProps): ReactElement {
   const isInteractive = !(disabled ?? false) && !(loading ?? false);
 
@@ -104,9 +116,17 @@ export function Action({
     <Pressable
       onPress={handlePress}
       disabled={!(isInteractive)}
-      accessibilityRole={href !== undefined ? "link" : "button"}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      accessibilityRole={(role ?? (href !== undefined ? "link" : "button")) as any}
       accessibilityLabel={label}
-      accessibilityState={{ disabled: disabled ?? false, busy: loading ?? false }}
+      accessibilityState={{
+        disabled: disabled ?? false,
+        busy:     loading ?? false,
+        expanded: ariaExpanded,
+        checked:  ariaPressed,
+        selected: ariaSelected,
+      }}
+      importantForAccessibility={ariaHidden ? "no-hide-descendants" : undefined}
       testID={testId}
       style={({ pressed }) => ({
         ...VARIANT_STYLES[variant],
@@ -135,7 +155,7 @@ export function Action({
           ...(variant === "link" && { textDecorationLine: "underline" as const }),
         }}
       >
-        {children as React.ReactNode}
+        {children as ReactNode}
       </RNText>
     </Pressable>
   );

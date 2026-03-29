@@ -57,6 +57,12 @@ export function Stack({
   label,
   testId,
   children,
+  role,
+  "aria-live":        ariaLive,
+  "aria-atomic":      ariaAtomic,
+  "aria-hidden":      ariaHidden,
+  "aria-describedby": ariaDescribedby,
+  "aria-labelledby":  ariaLabelledby,
 }: StackProps): ReactElement {
   // --- Padding resolution (least-to-most specific, later writes win) ---
   const pt_base = resolveSpace(padding);
@@ -92,7 +98,13 @@ export function Stack({
   return (
     <div
       style={style}
+      role={role}
       aria-label={label}
+      aria-live={ariaLive}
+      aria-atomic={ariaAtomic}
+      aria-hidden={ariaHidden}
+      aria-describedby={ariaDescribedby}
+      aria-labelledby={ariaLabelledby}
       data-testid={testId}
     >
       {children as ReactNode}

@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { View } from "react-native";
 import type { StackProps, StackDirection, StackAlign, StackJustify } from "@ultimatejs/primitives";
 import { resolveSpace, resolveColor, RADIUS_DP } from "./lib/tokens.js";
@@ -61,6 +61,15 @@ export function Stack({
   label,
   testId,
   children,
+  role,
+  "aria-live":        ariaLive,
+  // `aria-atomic` has no RN equivalent — silently ignored
+  "aria-atomic":      _ariaAtomic,
+  // `aria-hidden` → importantForAccessibility
+  "aria-hidden":      ariaHidden,
+  // `aria-describedby` / `aria-labelledby` not supported in RN new-arch — silently ignored
+  "aria-describedby": _ariaDescribedby,
+  "aria-labelledby":  _ariaLabelledby,
 }: StackProps): ReactElement {
   // Padding resolution — least-to-most specific (later assignments win)
   const baseP = resolveSpace(padding);
@@ -93,10 +102,14 @@ export function Stack({
         ...(wrap && { flexWrap: "wrap" as const }),
         ...(flex !== undefined && { flex }),
       }}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      accessibilityRole={role as any}
       accessibilityLabel={label}
+      accessibilityLiveRegion={ariaLive === "off" ? "none" : ariaLive}
+      importantForAccessibility={ariaHidden ? "no-hide-descendants" : undefined}
       testID={testId}
     >
-      {children as React.ReactNode}
+      {children as ReactNode}
     </View>
   );
 }

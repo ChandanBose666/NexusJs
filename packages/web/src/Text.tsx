@@ -62,6 +62,10 @@ export function Text({
   label,
   testId,
   children,
+  role,
+  "aria-hidden":      ariaHidden,
+  "aria-describedby": ariaDescribedby,
+  "aria-labelledby":  ariaLabelledby,
 }: TextProps): ReactElement {
   const Tag = as ?? VARIANT_TAG[variant];
 
@@ -90,7 +94,11 @@ export function Text({
   return (
     <Tag
       style={style}
+      role={role}
       aria-label={label}
+      aria-hidden={ariaHidden}
+      aria-describedby={ariaDescribedby}
+      aria-labelledby={ariaLabelledby}
       data-testid={testId}
     >
       {children}

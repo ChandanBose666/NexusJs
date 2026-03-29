@@ -132,6 +132,12 @@ export function Input({
   onSubmit,
   label,
   testId,
+  "aria-autocomplete":      ariaAutocomplete,
+  "aria-errormessage":      ariaErrormessage,
+  "aria-activedescendant":  ariaActivedescendant,
+  "aria-hidden":            ariaHidden,
+  "aria-describedby":       ariaDescribedby,
+  "aria-labelledby":        ariaLabelledby,
 }: InputProps): ReactElement {
   const hasLeading  = leadingIcon !== undefined;
   const hasTrailing = trailingIcon !== undefined;
@@ -194,16 +200,24 @@ export function Input({
     required,
     disabled,
     readOnly,
-    "aria-label":     label ?? fieldLabel,
-    "aria-required":  required,
-    "aria-invalid":   error !== undefined ? (true as const) : undefined,
-    "data-testid":    testId,
+    "aria-label":             label ?? fieldLabel,
+    "aria-required":          required,
+    "aria-invalid":           error !== undefined ? (true as const) : undefined,
+    "aria-autocomplete":      ariaAutocomplete,
+    "aria-errormessage":      ariaErrormessage,
+    "aria-activedescendant":  ariaActivedescendant,
+    // Relationship attributes must land on the focusable control, not the wrapper
+    "aria-describedby":       ariaDescribedby,
+    "aria-labelledby":        ariaLabelledby,
+    "data-testid":            testId,
     onChange:  handleChange,
     onKeyDown: handleKeyDown,
   };
 
   return (
-    <div>
+    <div
+      aria-hidden={ariaHidden}
+    >
       {fieldLabel !== undefined ? (
         <label style={LABEL_STYLE}>
           {fieldLabel}

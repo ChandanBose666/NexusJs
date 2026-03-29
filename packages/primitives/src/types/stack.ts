@@ -26,6 +26,31 @@ export type StackJustify =
   | "around"
   | "evenly";
 
+/**
+ * ARIA roles appropriate for container and landmark elements.
+ */
+export type StackRole =
+  | "region"
+  | "main"
+  | "navigation"
+  | "complementary"
+  | "banner"
+  | "contentinfo"
+  | "search"
+  | "form"
+  | "group"
+  | "list"
+  | "listitem"
+  | "grid"
+  | "row"
+  | "rowgroup"
+  | "dialog"
+  | "alertdialog"
+  | "status"
+  | "alert"
+  | "log"
+  | "feed";
+
 export interface StackProps extends BaseProps {
   /** Layout direction. Defaults to "column". */
   direction?: StackDirection;
@@ -61,6 +86,18 @@ export interface StackProps extends BaseProps {
 
   /** Flex grow — allows a Stack inside another Stack to fill available space. */
   flex?: number;
+
+  /** ARIA role — promotes the container to a landmark or semantic region. */
+  role?: StackRole;
+
+  /**
+   * Announce dynamic content changes to screen readers.
+   * Use "polite" for non-urgent updates (e.g. search results), "assertive" for urgent alerts.
+   */
+  "aria-live"?: "off" | "polite" | "assertive";
+
+  /** When true, the entire live region is announced on any change (not just the changed node). */
+  "aria-atomic"?: boolean;
 
   children?: UltimateNode;
 }

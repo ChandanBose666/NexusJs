@@ -78,6 +78,16 @@ export function Action({
   children,
   // onPress, onChange — silently ignored (no JS in email)
   onPress: _onPress,
+  // ARIA props — silently ignored in email (interactive semantics have no meaning in email clients)
+  role:                     _role,
+  "aria-expanded":          _ariaExpanded,
+  "aria-pressed":           _ariaPressed,
+  "aria-haspopup":          _ariaHaspopup,
+  "aria-controls":          _ariaControls,
+  "aria-selected":          _ariaSelected,
+  "aria-hidden":            _ariaHidden,
+  "aria-describedby":       _ariaDescribedby,
+  "aria-labelledby":        _ariaLabelledby,
 }: ActionProps): string {
   const isDisabled = (disabled ?? false) || (loading ?? false);
 

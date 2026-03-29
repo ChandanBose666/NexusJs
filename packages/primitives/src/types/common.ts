@@ -44,10 +44,27 @@ export type FontWeight = "regular" | "medium" | "semibold" | "bold";
 export type TextAlign = "start" | "center" | "end";
 
 // ---------------------------------------------------------------------------
+// Universal ARIA props available on every primitive
+// ---------------------------------------------------------------------------
+
+/**
+ * ARIA attributes shared across all four primitives.
+ * Renderers that cannot express a given attribute (e.g. email) silently ignore it.
+ */
+export interface AriaBaseProps {
+  /** Remove the element from the accessibility tree entirely. */
+  "aria-hidden"?: boolean | "true" | "false";
+  /** ID of an element that provides a longer description of this one. */
+  "aria-describedby"?: string;
+  /** ID of an element that labels this one (overrides aria-label / label). */
+  "aria-labelledby"?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Shared style props available on every primitive
 // ---------------------------------------------------------------------------
 
-export interface BaseProps {
+export interface BaseProps extends AriaBaseProps {
   /** Accessible label, rendered as aria-label or equivalent. */
   label?: string;
   /** Test and analytics ID, injected as data-testid. */

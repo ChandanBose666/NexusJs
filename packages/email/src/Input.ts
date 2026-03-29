@@ -1,6 +1,6 @@
 import type { InputProps } from "@ultimatejs/primitives";
 import { DEFAULT_THEME } from "./lib/tokens.js";
-import { escapeHtml } from "./lib/html.js";
+import { escapeAttr, escapeHtml } from "./lib/html.js";
 
 /**
  * Email implementation of the <Input> primitive.
@@ -46,9 +46,16 @@ export function Input({
   paddingY: _paddingY,
   onChange: _onChange,
   onSubmit: _onSubmit,
+  // ARIA props — silently ignored in email (static placeholder only, no interactive semantics)
+  "aria-autocomplete":     _ariaAutocomplete,
+  "aria-errormessage":     _ariaErrormessage,
+  "aria-activedescendant": _ariaActivedescendant,
+  "aria-hidden":           _ariaHidden,
+  "aria-describedby":      _ariaDescribedby,
+  "aria-labelledby":       _ariaLabelledby,
 }: InputProps): string {
   const parts: string[] = [];
-  const testAttr = testId ? ` data-testid="${escapeHtml(testId)}"` : "";
+  const testAttr = testId ? ` data-testid="${escapeAttr(testId)}"` : "";
   const ariaLabel = label ? ` aria-label="${escapeHtml(label)}"` : "";
 
   // --- Label ---

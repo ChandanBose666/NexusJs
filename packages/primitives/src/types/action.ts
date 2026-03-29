@@ -23,7 +23,27 @@ export type ActionVariant =
 
 export type ActionSize = "xs" | "sm" | "md" | "lg";
 
-export interface ActionProps extends BaseProps {
+/**
+ * ARIA roles that make semantic sense on an interactive action element.
+ * The renderer's native element (button/a/Pressable) carries an implicit role;
+ * this prop overrides it for custom widget patterns.
+ */
+export type ActionRole =
+  | "button"
+  | "link"
+  | "menuitem"
+  | "menuitemcheckbox"
+  | "menuitemradio"
+  | "option"
+  | "tab"
+  | "switch"
+  | "checkbox"
+  | "radio";
+  // "combobox" is intentionally excluded — ARIA 1.2 defines it as a composite
+  // container role (requires an <input> descendant), not an interactive widget role.
+
+/** All non-discriminating Action props. Not exported — use ActionProps. */
+interface ActionBase extends BaseProps {
   /** Visual style. Defaults to "primary". */
   variant?: ActionVariant;
 
@@ -69,5 +89,40 @@ export interface ActionProps extends BaseProps {
   /** Full-width stretch. */
   fullWidth?: boolean;
 
-  children?: UltimateNode;
+  /** ARIA role override for custom widget patterns. */
+  role?: ActionRole;
+
+  /** Whether a controlled popup (menu, dialog, etc.) is currently expanded. */
+  "aria-expanded"?: boolean;
+
+  /** Reflects the pressed state of a toggle button. */
+  "aria-pressed"?: boolean | "mixed";
+
+  /** Indicates that this element owns a popup of the given type. */
+  "aria-haspopup"?: boolean | "menu" | "listbox" | "tree" | "grid" | "dialog";
+
+  /** ID of the element this action controls or owns. */
+  "aria-controls"?: string;
+
+  /** Whether this action is the currently selected item in a set (tabs, options). */
+  "aria-selected"?: boolean;
 }
+
+/**
+ * <Action> prop type.
+ *
+ * Discriminated union: when `children` is absent, `label` is required to ensure
+ * every action has an accessible name. When `children` is present, `label` is
+ * optional (acts as an explicit aria-label override).
+ *
+ * @example Required label when no children:
+ *   <Action label="Close dialog" />          // ✓
+ *   <Action />                               // ✗ TypeScript error
+ *
+ * @example Optional label when children present:
+ *   <Action>Save changes</Action>            // ✓
+ *   <Action label="Save">Save changes</Action>  // ✓ (redundant but valid)
+ */
+export type ActionProps =
+  | (ActionBase & { children: UltimateNode; label?: string })
+  | (ActionBase & { children?: never; label: string });

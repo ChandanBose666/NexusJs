@@ -106,6 +106,14 @@ export function Input({
   onSubmit,
   label,
   testId,
+  // All new ARIA Input props have no RN TextInput equivalent — silently ignored
+  "aria-autocomplete":      _ariaAutocomplete,
+  "aria-errormessage":      _ariaErrormessage,
+  "aria-activedescendant":  _ariaActivedescendant,
+  // `aria-hidden` → importantForAccessibility on outer View
+  "aria-hidden":            ariaHidden,
+  "aria-describedby":       _ariaDescribedby,
+  "aria-labelledby":        _ariaLabelledby,
 }: InputProps): ReactElement {
   // Padding overrides
   let pv = BASE_INPUT_STYLE.paddingVertical;
@@ -139,7 +147,7 @@ export function Input({
   };
 
   return (
-    <View>
+    <View importantForAccessibility={ariaHidden ? "no-hide-descendants" : undefined}>
       {fieldLabel !== undefined ? (
         <RNText style={LABEL_STYLE}>
           {fieldLabel}

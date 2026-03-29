@@ -22,6 +22,29 @@ export type TextVariant =
 /** Semantic HTML element override (web only — ignored on other targets). */
 export type TextElement = "p" | "span" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "pre" | "code";
 
+/**
+ * ARIA roles appropriate for typographic and text elements.
+ */
+export type TextRole =
+  | "heading"
+  | "paragraph"
+  | "note"
+  | "definition"
+  | "term"
+  | "tooltip"
+  | "status"
+  | "alert"
+  | "log"
+  | "marquee"
+  | "timer"
+  | "code"
+  | "emphasis"
+  | "strong"
+  | "deletion"
+  | "insertion"
+  | "subscript"
+  | "superscript";
+
 export interface TextProps extends BaseProps {
   /** Visual style preset. Targets map each variant to their native equivalent. */
   variant?: TextVariant;
@@ -52,6 +75,9 @@ export interface TextProps extends BaseProps {
    * Does not affect visual style — use `variant` for that.
    */
   as?: TextElement;
+
+  /** ARIA role override — use when the rendered element does not carry the right semantic. */
+  role?: TextRole;
 
   children?: string | number | (string | number)[];
 }

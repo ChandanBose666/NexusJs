@@ -1,6 +1,6 @@
 import type { StackProps } from "@ultimatejs/primitives";
 import { resolveSpace, resolveColor, RADIUS_PX } from "./lib/tokens.js";
-import { buildStyle, stringify } from "./lib/html.js";
+import { buildStyle, escapeAttr, stringify } from "./lib/html.js";
 
 /**
  * Email implementation of the <Stack> primitive.
@@ -37,6 +37,14 @@ export function Stack({
   label,
   testId,
   children,
+  // role — overrides the default role="presentation" when semantic structure is needed
+  role,
+  // Dynamic ARIA props have no meaning in email clients — silently ignored
+  "aria-live":        _ariaLive,
+  "aria-atomic":      _ariaAtomic,
+  "aria-hidden":      _ariaHidden,
+  "aria-describedby": _ariaDescribedby,
+  "aria-labelledby":  _ariaLabelledby,
 }: StackProps): string {
   // --- Padding resolution (least-to-most specific) ---
   const baseP  = resolveSpace(padding);
@@ -84,9 +92,9 @@ export function Stack({
   // --- Row layout: children fill a single <tr>, expected to be <td> elements ---
   if (direction === "row" || direction === "row-reverse") {
     return [
-      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"`,
+      `<table role="${role ?? "presentation"}" width="100%" cellpadding="0" cellspacing="0" border="0"`,
       ` style="${tableStyle}"`,
-      label   ? ` aria-label="${label}"` : "",
+      label   ? ` aria-label="${escapeAttr(label)}"` : "",
       testId  ? ` data-testid="${testId}"` : "",
       `>`,
       `<tr valign="${valign}" align="${halign}">`,
@@ -98,7 +106,7 @@ export function Stack({
 
   // --- Column layout (default): children stack in a single <td> ---
   return [
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"`,
+    `<table role="${role ?? "presentation"}" width="100%" cellpadding="0" cellspacing="0" border="0"`,
     ` style="${tableStyle}"`,
     label  ? ` aria-label="${label}"` : "",
     testId ? ` data-testid="${testId}"` : "",

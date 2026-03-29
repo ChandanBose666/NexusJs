@@ -105,4 +105,22 @@ export interface InputProps extends BaseProps {
    * or the return key (Native).
    */
   onSubmit?: (value: string) => void;
+
+  /**
+   * Whether and how autocomplete suggestions are provided.
+   * Only meaningful when the input has a predictive popup (e.g. a combobox).
+   */
+  "aria-autocomplete"?: "none" | "inline" | "list" | "both";
+
+  /**
+   * ID of the element containing the error message for this field.
+   * Complements the `error` prop — use when the error message element has a known ID.
+   */
+  "aria-errormessage"?: string;
+
+  /**
+   * ID of the currently focused descendant in a composite widget
+   * (e.g. a combobox with an active listbox option).
+   */
+  "aria-activedescendant"?: string;
 }
