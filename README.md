@@ -21,6 +21,8 @@ UltimateJs eliminates entire categories of boilerplate by making the infrastruct
 - [Pillar 3 — Zero-Fetch Sync](#pillar-3--zero-fetch-sync-phase-4-complete)
 - [Pillar 4 — Sidecar Worker](#pillar-4--sidecar-worker-phase-51-complete)
 - [Pillar 5 — Nexus Inspector](#pillar-5--nexus-inspector-phase-52-complete)
+- [Pillar 6 — Snapshot Boundary](#pillar-6--snapshot-boundary-phase-53-complete)
+- [Phase 6 — Accessibility Layer](#phase-6--accessibility-layer-complete)
 - [Monorepo Structure](#monorepo-structure)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
@@ -50,7 +52,9 @@ UltimateJs/
 │   ├── primitives/    ← TypeScript type contracts for all four UI primitives
 │   ├── web/           ← Renders primitives as React/HTML (inline styles + CSS vars)
 │   ├── native/        ← Renders primitives as React Native View/Text/Pressable/TextInput
-│   └── email/         ← Renders primitives as MSO-safe HTML strings
+│   ├── email/         ← Renders primitives as MSO-safe HTML strings
+│   ├── snapshot/      ← React Error Boundary with time-travel restore via ring buffer
+│   └── a11y/          ← Accessibility runtime utilities, test helpers, nexus-a11y CLI
 └── apps/
     └── web/           ← Vite demo/dev app (wired to @ultimatejs/vite-plugin)
 ```
@@ -433,6 +437,257 @@ A floating panel in the bottom-right corner shows a live count of each kind. It 
 
 ---
 
+## Pillar 6 — Snapshot Boundary *(Phase 5.3, complete)*
+
+`@ultimatejs/snapshot` is a React Error Boundary that automatically recovers from render errors by rewinding state through a ring buffer of previously-good snapshots — time-travel error recovery with zero configuration.
+
+```tsx
+import { SnapshotBoundary, useSnapshot } from '@ultimatejs/snapshot';
+
+function Editor() {
+  const { value, setValue, boundaryProps } = useSnapshot(initialDoc, { capacity: 10 });
+
+  return (
+    <SnapshotBoundary
+      {...boundaryProps}
+      onRestore={(data, meta) => {
+        console.log(`Restored to snapshot. ${meta.remaining} remaining.`);
+      }}
+    >
+      <DocumentEditor value={value} onChange={setValue} />
+    </SnapshotBoundary>
+  );
+}
+```
+
+When `DocumentEditor` throws during render, the boundary automatically:
+
+1. Pops the most recent good snapshot from the ring buffer
+2. Calls `onRestore(data, meta)` with the restored data and diagnostics
+3. Re-renders children with the restored state — no flash of the fallback UI
+
+```tsx
+// The ring buffer is also usable standalone
+import { SnapshotBuffer } from '@ultimatejs/snapshot';
+
+const buffer = new SnapshotBuffer<AppState>(5); // capacity = 5
+buffer.push(stateV1);
+buffer.push(stateV2);
+buffer.push(stateV3);
+
+const prev = buffer.pop();  // → stateV3 (newest first)
+const all  = buffer.getAll(); // → [stateV3, stateV2, stateV1]
+```
+
+**`RestoreMeta`** carries `timestamp`, `remaining` (snapshots left after this restore), and `error` — useful for telemetry and retry-limit UI. When the buffer is exhausted, the boundary renders the `fallback` prop rather than looping.
+
+---
+
+## Phase 6 — Accessibility Layer *(complete)*
+
+Phase 6 adds a multi-layer accessibility system to UltimateJs: compile-time WCAG scanning in the Rust AST, enforced ARIA prop types in the design system, runtime accessibility utilities for React, and a compliance CLI for auditing built HTML files.
+
+### Task 6.1 — `AccessibilityScanner` (Rust)
+
+The Rust compiler now includes an `AccessibilityScanner` SWC AST visitor that detects 6 WCAG 2.1 AA rules at compile time — before the code ever runs in a browser.
+
+```rust
+// Integrated into the compiler pipeline automatically.
+// Violations surface as JSON alongside the sliced output.
+```
+
+| Rule ID | WCAG Criterion | Severity | What it catches |
+|---|---|---|---|
+| `missing-alt` | 1.1.1 | Error | `<img>` without any `alt` attribute (`alt=""` is valid — decorative) |
+| `unlabeled-action` | 4.1.2 | Error | `<Action>` with no text child and no `aria-label`/`aria-labelledby` |
+| `heading-order` | 1.3.1 | Warning | Heading level skips (h1 → h3); decreasing levels are fine |
+| `missing-input-label` | 1.3.1 | Error | `<input>`/`<Input>` without `aria-label`, `aria-labelledby`, or `id` |
+| `empty-link` | 2.4.4 | Error | `<a>` with no text content and no `aria-label` |
+| `positive-tabindex` | 2.4.3 | Warning | `tabIndex > 0` disrupts natural focus order |
+
+### Task 6.2 — Enforced ARIA Prop Types
+
+`@ultimatejs/primitives` now enforces ARIA attributes at the TypeScript level across all three renderers. The `role` prop uses discriminated unions so only legal ARIA roles are accepted, and role-specific required attributes are enforced at compile time.
+
+```tsx
+// TypeScript error — 'menu' requires aria-label or aria-labelledby
+<Action role="menu" />
+
+// OK — required attribute provided
+<Action role="menu" aria-label="Main navigation" />
+
+// Full ARIA attribute set on all primitives
+<Stack role="region" aria-label="Search results" aria-live="polite">
+  <Text aria-level={2} role="heading">Results</Text>
+</Stack>
+```
+
+### Task 6.3 — `@ultimatejs/a11y` Runtime Utilities
+
+Five hooks and components for building fully-accessible React UIs:
+
+#### `useFocusTrap` — keyboard focus management
+
+```tsx
+import { useFocusTrap } from '@ultimatejs/a11y';
+
+function Modal({ isOpen, onClose }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusTrap(ref, { enabled: isOpen, onEscape: onClose });
+
+  return (
+    <div ref={ref} role="dialog" aria-modal>
+      <button onClick={onClose}>Close</button>
+      <input type="text" />
+    </div>
+  );
+}
+```
+
+Cycles Tab/Shift+Tab within the container. Excludes `[inert]` subtrees. Focuses the first focusable element on enable; restores focus on disable.
+
+#### `useAnnouncer` — screen reader announcements
+
+```tsx
+import { useAnnouncer } from '@ultimatejs/a11y';
+
+function SearchResults({ count }) {
+  const { announce } = useAnnouncer({ politeness: 'polite' });
+
+  useEffect(() => {
+    announce(`${count} results found`);
+  }, [count]);
+}
+```
+
+Injects a stable `aria-live` region directly into `document.body` — the same DOM node persists across announcements so screen readers track it reliably. Repeating the same message works via a 50ms clear + set cycle.
+
+#### `SkipNavLink` / `SkipNavContent` — keyboard skip navigation
+
+```tsx
+import { SkipNavLink, SkipNavContent } from '@ultimatejs/a11y';
+
+function Layout({ children }) {
+  return (
+    <>
+      <SkipNavLink />          {/* visually hidden; appears on focus */}
+      <Header />
+      <SkipNavContent>        {/* <main tabIndex={-1}> */}
+        {children}
+      </SkipNavContent>
+    </>
+  );
+}
+```
+
+`SkipNavLink` is positioned off-screen and slides into view on `:focus`. CSS is injected once into `<head>` with a dedup guard.
+
+#### `useReducedMotion` — respect motion preferences
+
+```tsx
+import { useReducedMotion } from '@ultimatejs/a11y';
+
+function AnimatedBanner() {
+  const reduced = useReducedMotion();
+  return (
+    <div style={{ transition: reduced ? 'none' : 'transform 0.3s ease' }}>
+      …
+    </div>
+  );
+}
+```
+
+Subscribes to `prefers-reduced-motion: reduce` via `matchMedia`. SSR-safe — returns `false` when `window` is unavailable.
+
+#### `VisuallyHidden` — accessible hidden content
+
+```tsx
+import { VisuallyHidden } from '@ultimatejs/a11y';
+
+<button>
+  <span aria-hidden>✕</span>
+  <VisuallyHidden>Close dialog</VisuallyHidden>
+</button>
+```
+
+Renders with 1px dimensions, absolute positioning, and `clip` — visible to screen readers, invisible to sighted users. The `as` prop accepts any HTML element (`span`, `p`, `h2`, etc.).
+
+### Task 6.4 — Test Utilities + `nexus-a11y` CLI
+
+#### `@ultimatejs/a11y/test` — jest + axe-core helpers
+
+```ts
+import {
+  runA11yAudit,
+  expectNoViolations,
+  renderWithA11y,
+  formatViolations,
+} from '@ultimatejs/a11y/test';
+
+// In a jest + jsdom test file
+it('has no accessibility violations', async () => {
+  const { container } = render(<LoginForm />);
+  await expectNoViolations(container);
+});
+
+// Or combine render + audit in one call
+it('renders accessibly', async () => {
+  const { violations } = await renderWithA11y(<LoginForm />);
+  expect(violations).toHaveLength(0);
+});
+```
+
+Uses axe-core directly in the jsdom environment. `expectNoViolations` throws a readable error listing every violation with impact, rule ID, help URL, and affected HTML nodes.
+
+#### `nexus-a11y` CLI — WCAG 2.1 AA compliance reporter
+
+```bash
+# Audit a built HTML file
+npx nexus-a11y dist/index.html
+
+# JSON output for CI integration
+npx nexus-a11y dist/index.html --output json
+
+# Non-blocking CI mode (always exit 0)
+npx nexus-a11y dist/index.html --exit-zero
+
+# Custom axe tag filter
+npx nexus-a11y dist/index.html --tags wcag2a,wcag2aa
+```
+
+**Sample output:**
+
+```
+── VIOLATIONS (1) ───────────────────────────────────────────────────────────
+  [CRITICAL] image-alt
+  Images must have alternate text
+  https://dequeuniversity.com/rules/axe/4.7/image-alt
+  Affected nodes (1):
+    • <img src="hero.jpg">
+      Fix: Image element does not have an alt attribute
+
+── MANUAL VERIFICATION REQUIRED (20 checks) ─────────────────────────────────
+  □ 2.1.1  Keyboard — All functionality available via keyboard
+  □ 1.4.1  Use of Color — Color not used as the only visual means of conveying info
+  □ 2.4.7  Focus Visible — Keyboard focus indicator is visible
+  … 17 more checks
+
+── COVERAGE REPORT ──────────────────────────────────────────────────────────
+  Principle        Full    Partial  Manual   Criteria
+  Perceivable        1       10       7        18
+  Operable           1        7       5        13
+  Understandable     0        5       5        10
+  Robust             0        1       3         4 (WCAG 2.1 additions counted here)
+  ──────────────────────────────────────────────────────────────────────────
+  TOTAL              2       23      25        50   (52% automated)
+
+nexus-a11y: ✗ 1 violation — 20 WCAG 2.1 AA manual checks required
+```
+
+The CLI injects axe-core into a JSDOM sandbox — no browser required. The WCAG coverage map tracks all 50 WCAG 2.1 A + AA success criteria with `full` / `partial` / `manual` automation status. Exit code is 1 when violations are found (overridable with `--exit-zero`).
+
+---
+
 ## Monorepo Structure
 
 ```
@@ -450,7 +705,9 @@ UltimateJs/
 │   ├── core/                  @ultimatejs/core — useSync hook + WASM loader
 │   ├── sync-server/           @ultimatejs/sync-server — WebSocket binary sync server
 │   ├── sidecar/               @ultimatejs/sidecar — Web Worker script offloader
-│   └── inspector/             @ultimatejs/inspector — DevTools overlay (server/client map)
+│   ├── inspector/             @ultimatejs/inspector — DevTools overlay (server/client map)
+│   ├── snapshot/              @ultimatejs/snapshot — Error Boundary with time-travel restore
+│   └── a11y/                  @ultimatejs/a11y — Accessibility utilities, test helpers, nexus-a11y CLI
 ├── docs/
 │   ├── action-plan.md         Task-by-task build plan
 │   └── implementation-plan.md
@@ -474,6 +731,7 @@ UltimateJs/
 | Web renderer | React 18/19 | Peer dep, inline styles |
 | Native renderer | React Native ≥ 0.72 | Peer dep, StyleSheet-compatible objects |
 | Email renderer | Zero deps | Pure TypeScript string composition |
+| Accessibility testing | axe-core | Industry-standard WCAG rules engine |
 | Language | TypeScript 5.4+ | Strict mode throughout |
 
 ---
@@ -498,8 +756,9 @@ cargo build --release
 cd ../..
 
 # 3. Run tests
-cd packages/compiler && cargo test    # Rust unit tests
+cd packages/compiler && cargo test    # Rust unit tests (39 tests)
 cd packages/email   && npx jest       # Email renderer tests (40 tests)
+cd packages/a11y    && npx jest       # Accessibility tests (124 tests)
 
 # 4. Start the dev server
 pnpm dev
@@ -547,22 +806,22 @@ pnpm dev
 | 4.3 | WebSocket binary transport — delta broadcast server |
 | 4.4 | Optimistic rollbacks — revert local state on rejection |
 
-### Phase 5 — Sidecar & Polish 🔄
+### Phase 5 — Sidecar & Polish ✅
 
 | Task | Status | Description |
 |---|---|---|
-| 5.1 | ✅ | `@ultimatejs/sidecar` — Partytown-style Web Worker offloads 3rd-party tracking scripts |
-| 5.2 | ✅ | `@ultimatejs/inspector` — browser DevTools overlay with color-coded server/client map |
-| 5.3 | ✅ | `@ultimatejs/snapshot` — React Error Boundary with automatic time-travel restore via ring buffer |
+| 5.1 | ✅ | `@ultimatejs/sidecar` — Partytown-style Web Worker offloads 3rd-party tracking scripts (49 tests) |
+| 5.2 | ✅ | `@ultimatejs/inspector` — browser DevTools overlay with color-coded server/client map (59 tests) |
+| 5.3 | ✅ | `@ultimatejs/snapshot` — React Error Boundary with time-travel restore via ring buffer (39 tests) |
 
-### Phase 6 — Accessibility Layer 🔄
+### Phase 6 — Accessibility Layer ✅
 
 | Task | Status | Description |
 |---|---|---|
-| 6.1 | ✅ | `AccessibilityScanner` (Rust) — SWC AST visitor detecting 6 WCAG 2.1 AA rules |
-| 6.2 | ⏳ | Enforced ARIA prop types in `@ultimatejs/primitives` + all three renderers |
-| 6.3 | ⏳ | `@ultimatejs/a11y` runtime utilities — `useFocusTrap`, `useAnnouncer`, `SkipNav`, etc. |
-| 6.4 | ⏳ | Test utilities + `nexus-a11y` compliance reporter CLI |
+| 6.1 | ✅ | `AccessibilityScanner` (Rust) — SWC AST visitor detecting 6 WCAG 2.1 AA rules (20 tests) |
+| 6.2 | ✅ | Enforced ARIA prop types in `@ultimatejs/primitives` + all three renderers (45+ tests) |
+| 6.3 | ✅ | `@ultimatejs/a11y` runtime utilities — `useFocusTrap`, `useAnnouncer`, `SkipNav`, `useReducedMotion`, `VisuallyHidden` (51 tests) |
+| 6.4 | ✅ | `@ultimatejs/a11y/test` axe-core helpers + `nexus-a11y` compliance reporter CLI with WCAG coverage map (124 tests) |
 
 ---
 
