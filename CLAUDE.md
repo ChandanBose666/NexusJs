@@ -223,8 +223,24 @@ src/
 - jsdom clip normalization: `rect(0, 0, 0, 0)` → `rect(0px, 0px, 0px, 0px)`; test uses `toMatch(/rect\(0/)` instead of exact string equality
 - 51 unit tests: use-focus-trap (10) + use-announcer (8) + skip-nav (16) + use-reduced-motion (7) + visually-hidden (9); all run in jest-environment-jsdom
 
-## In Progress
-- [ ] Phase 6 — Accessibility Layer (Task 6.4 next)
+- [x] Task 6.4 — Test utilities + compliance reporter: `@ultimatejs/a11y/test` + `nexus-a11y` CLI, 73 new tests (124 total in package)
+
+## A11y Test + CLI design decisions (Task 6.4)
+- **`@ultimatejs/a11y/test`** sub-export (`src/test/index.ts`) wraps axe-core for jest+jsdom: `runA11yAudit(container)`, `expectNoViolations(container)`, `renderWithA11y(ui)`, `formatViolations(violations)`; axe-core uses the global jsdom document provided by jest — no JSDOM setup needed in test files
+- **`axe-core` + jsdom canvas**: axe-core's `color-contrast` rule calls `HTMLCanvasElement.getContext()` in jsdom, which logs a non-fatal `console.error` ("Not implemented"); this is a known limitation — tests still pass; suppress with `jest.spyOn(console, 'error').mockImplementation(() => {})` if needed
+- **`auditHtml(html)` (CLI audit module)**: injects axe-core source into a JSDOM window via `dom.window.eval(axeSource)` so axe runs in the JSDOM sandbox; `createRequire(import.meta.url)` resolves the axe-core bundle path in ESM context; `@jest-environment node` docblock on audit tests prevents global jsdom conflicts
+- **`nexus-a11y` CLI**: uses Node.js built-in `parseArgs` from `node:util` (no third-party parser); entry at `src/cli/nexus-a11y.ts` compiled to `dist/cli/nexus-a11y.js`; shebang wrapper at `bin/nexus-a11y.mjs` imports the compiled output (tsc does not reliably preserve shebangs)
+- **`WCAG_CRITERIA`**: 50 WCAG 2.1 AA success criteria with `automation: 'full' | 'partial' | 'manual'`; `getCoverageStats()` aggregates by status and principle for the coverage report
+- **`MANUAL_CHECKS`**: 20 high-priority human-review items; each has `criterionId`, `title`, and actionable `instructions`; always printed at the end of CLI output so devs cannot ignore the non-automatable ~60%
+- **Reporter output order**: violations (sorted by impact: critical→serious→moderate→minor) → manual checklist → WCAG coverage table → one-line summary line; summary line always emitted last so it's visible in truncated CI logs
+- **Build summary line**: `buildSummaryLine(violations)` exported separately so build systems can call it without running the full CLI
+
+## Phase 6 complete ✅
+All four tasks of Phase 6 (Accessibility Layer) are done:
+- 6.1 Rust AST scanner — 20 tests
+- 6.2 Enforced ARIA prop types — 45+ tests
+- 6.3 Runtime utilities — 51 tests
+- 6.4 Test utilities + CLI — 73 tests
 
 ## Optimistic rollback design decisions (Task 4.4)
 - Protocol: server sends single byte 0xFF (REJECTION_FRAME) when store.merge() throws on invalid bytes

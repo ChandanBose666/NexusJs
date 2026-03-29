@@ -2,13 +2,20 @@
   "name": "@ultimatejs/a11y",
   "version": "0.1.0",
   "type": "module",
-  "description": "UltimateJs Accessibility Utilities — focus trap, announcer, skip nav, reduced motion, visually hidden",
+  "description": "UltimateJs Accessibility — runtime utilities, axe-core test helpers, and nexus-a11y compliance CLI",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "nexus-a11y": "./bin/nexus-a11y.mjs"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./test": {
+      "import": "./dist/test/index.js",
+      "types": "./dist/test/index.d.ts"
     }
   },
   "scripts": {
@@ -20,12 +27,17 @@
     "react": "^18 || ^19",
     "react-dom": "^18 || ^19"
   },
+  "dependencies": {
+    "axe-core": "^4.7.0",
+    "jsdom": "^25.0.0"
+  },
   "devDependencies": {
     "@jest/globals": "^30.3.0",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^14.0.0",
     "@testing-library/user-event": "^14.0.0",
     "@types/jest": "^29.0.0",
+    "@types/jsdom": "^21.0.0",
     "@types/node": "^22.0.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
