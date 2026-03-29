@@ -1,0 +1,21 @@
+{
+  "name": "create-ultimatejs",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Create a new UltimateJs application",
+  "bin": {
+    "create-ultimatejs": "./bin/create-ultimatejs.mjs",
+    "ultimatejs": "./bin/ultimatejs.mjs"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.4.0"
+  }
+}
