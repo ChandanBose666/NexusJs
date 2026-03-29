@@ -20,6 +20,7 @@ UltimateJs eliminates entire categories of boilerplate by making the infrastruct
 - [Pillar 2 — Semantic UI](#pillar-2--semantic-ui-phase-3-complete)
 - [Pillar 3 — Zero-Fetch Sync](#pillar-3--zero-fetch-sync-phase-4-complete)
 - [Pillar 4 — Sidecar Worker](#pillar-4--sidecar-worker-phase-51-complete)
+- [Pillar 5 — Nexus Inspector](#pillar-5--nexus-inspector-phase-52-complete)
 - [Monorepo Structure](#monorepo-structure)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
@@ -388,6 +389,50 @@ return result  ──────────────────►  Promis
 
 ---
 
+## Pillar 5 — Nexus Inspector *(Phase 5.2, complete)*
+
+`@ultimatejs/inspector` is a zero-dependency browser overlay for development that shows exactly which components are running on the server, which run on the client, and which cross the boundary — directly on your rendered page.
+
+```ts
+import { initInspector } from '@ultimatejs/inspector';
+
+// Drop this in your dev entry point
+const inspector = initInspector();
+
+// Toggle with a keyboard shortcut
+document.addEventListener('keydown', (e) => {
+  if (e.altKey && e.key === 'i') inspector.toggle();
+});
+
+// Clean up on HMR dispose
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => inspector.destroy());
+}
+```
+
+Mark components in the DOM using the `data-ultimate-kind` attribute (set automatically by `@ultimatejs/web` or the compiler):
+
+```tsx
+// @ultimatejs/web adds this automatically based on compiler output
+<div data-ultimate-kind="server" data-ultimate-name="UserCard">…</div>
+<div data-ultimate-kind="client" data-ultimate-name="Button">…</div>
+<div data-ultimate-kind="boundary" data-ultimate-name="useUserData">…</div>
+```
+
+### What you see
+
+| Kind | Colour | Meaning |
+|---|---|---|
+| `server` | 🔵 Blue | Runs only on the server — no browser APIs |
+| `client` | 🟠 Orange | Runs only in the browser — uses DOM/window |
+| `shared` | 🟢 Green | Safe on both sides — pure logic |
+| `boundary` | 🟣 Purple | Server fn called from client — RPC stub generated |
+| `mixed` | 🔴 Red | Error — uses both server and client triggers |
+
+A floating panel in the bottom-right corner shows a live count of each kind. It auto-updates via `MutationObserver` as components mount and unmount.
+
+---
+
 ## Monorepo Structure
 
 ```
@@ -404,7 +449,8 @@ UltimateJs/
 │   ├── crdt/                  @ultimatejs/crdt — Automerge CRDT compiled to WASM
 │   ├── core/                  @ultimatejs/core — useSync hook + WASM loader
 │   ├── sync-server/           @ultimatejs/sync-server — WebSocket binary sync server
-│   └── sidecar/               @ultimatejs/sidecar — Web Worker script offloader
+│   ├── sidecar/               @ultimatejs/sidecar — Web Worker script offloader
+│   └── inspector/             @ultimatejs/inspector — DevTools overlay (server/client map)
 ├── docs/
 │   ├── action-plan.md         Task-by-task build plan
 │   └── implementation-plan.md
@@ -506,7 +552,7 @@ pnpm dev
 | Task | Status | Description |
 |---|---|---|
 | 5.1 | ✅ | `@ultimatejs/sidecar` — Partytown-style Web Worker offloads 3rd-party tracking scripts |
-| 5.2 | ⏳ | UltimateJs Inspector — browser DevTools overlay showing server/client split |
+| 5.2 | ✅ | `@ultimatejs/inspector` — browser DevTools overlay with color-coded server/client map |
 | 5.3 | ⏳ | Snapshot boundary — time-travel error recovery |
 
 ---
