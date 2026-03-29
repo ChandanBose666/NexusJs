@@ -20,7 +20,8 @@ UltimateJs/
 │   ├── web/                  # Web renderer: maps primitives → HTML + inline styles
 │   ├── native/               # Native renderer: maps primitives → React Native View/Text/Pressable/TextInput
 │   ├── email/                # Email renderer: maps primitives → MSO-safe HTML strings (TNode=string)
-│   └── sidecar/              # Web Worker sidecar — offloads 3rd-party scripts, DOM proxy
+│   ├── sidecar/              # Web Worker sidecar — offloads 3rd-party scripts, DOM proxy
+│   └── inspector/            # DevTools overlay — color-coded server/client component map
 ├── docs/
 │   └── action-plan.md        # Master task list (5 phases)
 ├── package.json              # Root — turbo dev/build/test scripts
@@ -158,8 +159,24 @@ src/
 - Protocol: `WorkerToMain` = get/set/call; `MainToWorker` = response/error/load; type guards `isWorkerMessage` / `isMainMessage`
 - 49 unit tests: protocol (15) + worker-proxy (19) + sidecar (15); all run in Node without jsdom
 
+- [x] Task 5.2 — Nexus Inspector: `@ultimatejs/inspector` — browser DevTools overlay with color-coded component outlines + floating stats panel, 59 tests
+
+## Nexus Inspector design decisions (Task 5.2)
+- Package: `packages/inspector` (`@ultimatejs/inspector`), TypeScript ESM, browser-only (no Node peer deps)
+- Opt-in via `data-ultimate-kind="server|client|shared|boundary|mixed"` on DOM elements (set by web renderer or compiler)
+- Optional `data-ultimate-name` attribute for component display name
+- **CSS-only outlines**: injects a single `<style>` element with `outline` rules — zero JS per-element, always correctly positioned, no scroll/resize listeners needed
+- **`::after` kind badges**: CSS pseudo-element renders a colored label in the top-left of each annotated element; `position: relative !important` is added to the host (acceptable dev-tool tradeoff)
+- `buildStylesheet(dataAttr)` — pure function, returns CSS string; fully testable without DOM
+- `buildStatsRows(stats)` / `buildPanelContent(stats)` — pure HTML-string builders; testable without DOM
+- `scanComponents(root, dataAttr)` — accepts `Scannable` interface (`querySelectorAll`) so it's testable without jsdom
+- `initInspector(opts?)` — manages enable/disable/toggle/refresh/destroy lifecycle; installs `MutationObserver` to auto-refresh when DOM changes
+- Panel: fixed-position bottom-right overlay, dark theme (`#1e1e2e`/Catppuccin palette), immune to host page CSS (all inline styles)
+- `ALL_KINDS` is `Object.freeze()`'d — runtime immutable, not just TypeScript readonly
+- 59 tests: types (8) + scanner (13) + styles (11) + panel (14) + inspector (13); uses `jest-environment-jsdom` for DOM tests
+
 ## In Progress
-- [ ] Phase 5 — Sidecar & Polish (Task 5.2 next: Nexus Inspector)
+- [ ] Phase 5 — Sidecar & Polish (Task 5.3 next: Snapshot Boundary)
 
 ## Optimistic rollback design decisions (Task 4.4)
 - Protocol: server sends single byte 0xFF (REJECTION_FRAME) when store.merge() throws on invalid bytes
