@@ -10,6 +10,8 @@ on:
 # `build`        — validates the monorepo builds without Rust (WASM-stub fallback path).
 # `scaffold-e2e` — validates `create-blazefw` produces a working project and the real
 #                  compiler (native + WASM) can slice its `.blazefw.tsx` output.
+# `server`       — runs @blazefw/server unit tests, builds the production Docker
+#                  image, and smoke-tests /health + the RPC route inside it.
 
 jobs:
   build:
@@ -44,6 +46,43 @@ jobs:
         run: |
           WASM_COUNT=$(find apps/web/dist -name "*.wasm" | wc -l)
           echo "Found $WASM_COUNT .wasm files"
+
+  server:
+    runs-on: ubuntu-latest
+    # The Docker image is the Phase 2 (Fly.io) deployable — keep it building.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # matches the runtime image (node:22-slim)
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Server unit tests
+        run: pnpm --filter @blazefw/server test
+
+      - name: Server build (tsc)
+        run: pnpm --filter @blazefw/server build
+
+      - name: Build Docker image
+        run: docker build -t blazefw-server .
+
+      - name: Smoke-test the image (health + RPC)
+        run: |
+          docker run -d --name blazefw-server-ci -p 3000:3000 blazefw-server
+          for i in $(seq 1 20); do
+            curl -fsS localhost:3000/health && break || sleep 1
+          done
+          curl -fsS localhost:3000/health
+          curl -fsS -X POST localhost:3000/api/__blazefw/getServerTime \
+            -H 'content-type: application/json' -d '{}'
+          docker rm -f blazefw-server-ci
 
   scaffold-e2e:
     runs-on: ubuntu-latest
