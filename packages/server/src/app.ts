@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { requestId, type RequestIdEnv } from "./middleware/request-id.js";
 import { requestLogger } from "./middleware/logging.js";
 import { health } from "./routes/health.js";
+import { rpc } from "./routes/rpc.js";
+import { registerDemoFunctions } from "./rpc/demo.js";
 
 /**
  * Assemble the BlazeFW server app. Pure — no listening socket, no env
@@ -28,6 +30,12 @@ export function createApp(): Hono<RequestIdEnv> {
   });
 
   app.route("/", health);
+
+  registerDemoFunctions();
+  // Primary prefix matches the documented compiler contract (__blazefw);
+  // __ultimate is a legacy alias from pre-rename planning docs. See README.
+  app.route("/api/__blazefw", rpc);
+  app.route("/api/__ultimate", rpc);
 
   // Dev-only route to exercise the error handler end to end.
   if (process.env.NODE_ENV !== "production") {

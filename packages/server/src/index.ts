@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { createApp } from "./app.js";
 
 export { createApp } from "./app.js";
+export { registerServerFn, getServerFn, type ServerFn } from "./rpc/registry.js";
 
 /** Start the HTTP server. Reads PORT from env (default 3000). */
 export function start(): void {
