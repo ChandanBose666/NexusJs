@@ -63,3 +63,20 @@ export async function getUser(id) {
   `// TODO(phase1.5): emit real fetch stubs + generate registry from compiler manifest`
 - The vite-plugin defines no constant for the API prefix; when stub emission
   lands, the prefix must be shared between compiler output and this server.
+- **Phase 4 fallback taken (2026-06-10):** because the generated client stub
+  throws instead of fetching, the demo round trip in `apps/web/src/main.ts`
+  calls the route manually via a hand-written `__blazefw_rpc(path, args)`
+  helper with the exact documented wire shape (`POST` + JSON args object,
+  raw JSON return). When the compiler emits real stubs, the demo helper
+  should be deleted and the generated code used instead. The demo app is
+  also vanilla TS (no React), so the "component" is a plain button — no
+  `.blazefw.tsx` file is routed through the slicer for this round trip.
+
+## Running in dev
+
+- Server only: `pnpm --filter @blazefw/server dev` (tsx watch, port 3000).
+- Server + web app together via Turborepo:
+  `pnpm turbo run dev --filter=@blazefw/server --filter=@blazefw/demo`
+  (root `pnpm dev` also works — it starts every package's watcher).
+- The web app's Vite dev server proxies `/api/__blazefw` and
+  `/api/__ultimate` to `localhost:3000` (see `apps/web/vite.config.ts`).
