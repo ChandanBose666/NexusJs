@@ -1,0 +1,12 @@
+.git
+.worktrees
+.turbo
+**/.turbo
+node_modules
+**/node_modules
+**/dist
+**/target
+**/pkg
+**/pkg-node
+Dockerfile
+.dockerignore
